@@ -1,0 +1,9 @@
+LIBRARY MDView
+EXPORTS
+    ListLoad        @1
+    ListLoadW       @2
+    ListCloseWindow @3
+    ListGetDetectString @4
+    ListSearchText  @5
+    ListSendCommand @6
+    ListSetDefaultParams @7
