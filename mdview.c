@@ -1,5 +1,5 @@
 /*
- * MDView v1.1 - Total Commander Lister Plugin for Markdown
+ * MDView v2.1 - Total Commander Lister Plugin for Markdown
  * =========================================================
  * Lightweight WLX plugin: built-in Markdown->HTML, embedded MSHTML, zero deps.
  *
@@ -572,7 +572,7 @@ static char g_iniPath[MAX_PATH] = {0};
 typedef struct {
     int fontSize;    /* 9-30, default 19 */
     int isDark;      /* 0 or 1, -1 = auto */
-    int maxWidth;    /* column width in px, default 960 */
+    int maxWidth;    /* column width in px, 0 = no limit, default 0 */
     int lineNums;    /* 0 or 1 */
 } MDVSettings;
 
@@ -582,12 +582,12 @@ static void load_settings(void) {
     if (!g_iniPath[0]) return;
     g_settings.fontSize = GetPrivateProfileIntA("MDView", "FontSize", 19, g_iniPath);
     g_settings.isDark   = GetPrivateProfileIntA("MDView", "DarkMode", -1, g_iniPath);
-    g_settings.maxWidth = GetPrivateProfileIntA("MDView", "MaxWidth", 960, g_iniPath);
+    g_settings.maxWidth = GetPrivateProfileIntA("MDView", "MaxWidth", 0, g_iniPath);
     g_settings.lineNums = GetPrivateProfileIntA("MDView", "LineNumbers", 0, g_iniPath);
     /* Clamp */
     if (g_settings.fontSize < 9) g_settings.fontSize = 9;
     if (g_settings.fontSize > 30) g_settings.fontSize = 30;
-    if (g_settings.maxWidth < 400) g_settings.maxWidth = 400;
+    if (g_settings.maxWidth != 0 && g_settings.maxWidth < 400) g_settings.maxWidth = 400;
     if (g_settings.maxWidth > 9999) g_settings.maxWidth = 9999;
 }
 
@@ -602,15 +602,21 @@ static void save_setting_int(const char* key, int val) {
 static void build_css(StrBuf* sb) {
     sb_append(sb,
     "*{box-sizing:border-box}"
-    "html{}");
+    "html{background:#fff;min-height:100%;width:100%}");
 
-    /* Body */
+    /* Body — full viewport background */
     sb_append(sb, "body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;");
     { char tmp[64]; sprintf(tmp, "font-size:%dpx;", g_settings.fontSize); sb_append(sb, tmp); }
-    sb_append(sb, "line-height:1.7;color:#24292e;background:#fff;margin:0 auto;padding:12px 32px 24px;");
-    { char tmp[64]; sprintf(tmp, "max-width:%dpx;", g_settings.maxWidth); sb_append(sb, tmp); }
-    sb_append(sb, "transition:background .2s,color .2s}");
+    sb_append(sb, "line-height:1.7;color:#24292e;background:#fff;margin:0;padding:0;"
+    "transition:background .2s,color .2s}");
     sb_append(sb, "body.dark{color:#d4d4d4;background:#1e1e1e}");
+
+    /* Content container — centered, optional max-width */
+    sb_append(sb, "#mdv-ct{margin:0 auto;padding:12px 32px 24px;");
+    if (g_settings.maxWidth > 0) {
+        char tmp[64]; sprintf(tmp, "max-width:%dpx;", g_settings.maxWidth); sb_append(sb, tmp);
+    }
+    sb_append(sb, "}");
 
     sb_append(sb,
     "h1,h2,h3,h4,h5,h6{color:#1a1a1a;margin-top:1.4em;margin-bottom:.6em;font-weight:600}"
@@ -782,14 +788,16 @@ static void build_js(StrBuf* sb) {
     "function af(){document.body.style.fontSize=fs+'px';toast('Font: '+fs+'px')}"
 
     /* Theme toggle */
-    "function td(){var b=document.body;"
-    "if(b.className.indexOf('dark')>=0){b.className=b.className.replace('dark','').replace(/^\\s+|\\s+$/g,'');toast('Light mode')}"
-    "else{b.className=(b.className?b.className+' ':'')+'dark';toast('Dark mode')}}"
+    "function td(){var b=document.body,h=document.documentElement;"
+    "if(b.className.indexOf('dark')>=0){b.className=b.className.replace('dark','').replace(/^\\s+|\\s+$/g,'');"
+    "h.style.background='#fff';toast('Light mode')}"
+    "else{b.className=(b.className?b.className+' ':'')+'dark';"
+    "h.style.background='#1e1e1e';toast('Dark mode')}}"
 
     /* Column width */
-    "function cw(){mw=Math.min(mw+80,9999);aw()}"
-    "function cn(){mw=Math.max(mw-80,400);aw()}"
-    "function aw(){document.body.style.maxWidth=mw+'px';toast('Width: '+mw+'px')}"
+    "function cw(){if(mw===0)mw=800;mw=Math.min(mw+80,9999);aw()}"
+    "function cn(){if(mw===0)return;mw=mw-80;if(mw<400){mw=0;document.getElementById('mdv-ct').style.maxWidth='none';toast('Width: full');return;}aw()}"
+    "function aw(){document.getElementById('mdv-ct').style.maxWidth=mw+'px';toast('Width: '+mw+'px')}"
 
     /* Line numbers toggle */
     "function tl(){"
@@ -1016,7 +1024,7 @@ static const char* get_ui(void) {
     "<div class=\"hrow\"><span>Close viewer</span><span class=\"hkeys\"><span class=\"kc\">Esc</span></span></div>"
     "<div class=\"hrow\"><span>This help</span><span class=\"hkeys\"><span class=\"kc\">F1</span></span></div>"
 
-    "<div class=\"help-foot\">MDView v2.0 &middot; Settings auto-saved &middot; Press Esc to close</div>"
+    "<div class=\"help-foot\">MDView v2.1 &middot; Settings auto-saved &middot; Press Esc to close</div>"
     "</div>";
 }
 
@@ -1111,7 +1119,7 @@ static void save_current_settings(IWebBrowser2* pB) {
         char title[128];
         WideCharToMultiByte(CP_UTF8, 0, bTitle, -1, title, sizeof(title), NULL, NULL);
         SysFreeString(bTitle);
-        int rfs=19, rmw=960, rln=0, rdk=0;
+        int rfs=19, rmw=0, rln=0, rdk=0;
         sscanf(title, "%d,%d,%d,%d", &rfs, &rmw, &rln, &rdk);
         save_setting_int("FontSize", rfs);
         save_setting_int("MaxWidth", rmw);
@@ -1124,7 +1132,29 @@ static LRESULT CALLBACK ContainerWndProc(HWND hwnd, UINT msg, WPARAM wP, LPARAM 
     MDViewData* d=(MDViewData*)GetWindowLongPtrW(hwnd,GWLP_USERDATA);
     switch(msg){
     case WM_SIZE:
-        if(d&&d->pBrowser){RECT rc;GetClientRect(hwnd,&rc);IWebBrowser2_put_Width(d->pBrowser,rc.right);IWebBrowser2_put_Height(d->pBrowser,rc.bottom);}
+        if(d&&d->pBrowser){
+            RECT rc; GetClientRect(hwnd,&rc);
+            /* Resize via IWebBrowser2 */
+            IWebBrowser2_put_Left(d->pBrowser, 0);
+            IWebBrowser2_put_Top(d->pBrowser, 0);
+            IWebBrowser2_put_Width(d->pBrowser, rc.right);
+            IWebBrowser2_put_Height(d->pBrowser, rc.bottom);
+            /* Also resize via IOleInPlaceObject for OLE containers that need it */
+            if(d->pOleObj){
+                IOleInPlaceObject* pIPO = NULL;
+                IOleObject_QueryInterface(d->pOleObj, &IID_IOleInPlaceObject, (void**)&pIPO);
+                if(pIPO){
+                    IOleInPlaceObject_SetObjectRects(pIPO, &rc, &rc);
+                    IOleInPlaceObject_Release(pIPO);
+                }
+            }
+            /* Force all child windows to match our size */
+            HWND child = GetWindow(hwnd, GW_CHILD);
+            while(child){
+                MoveWindow(child, 0, 0, rc.right, rc.bottom, TRUE);
+                child = GetWindow(child, GW_CHILD);
+            }
+        }
         return 0;
     case WM_SETFOCUS:
         if(d&&d->hwndIEServer) SetFocus(d->hwndIEServer);
@@ -1195,11 +1225,11 @@ __declspec(dllexport) HWND __stdcall ListLoad(HWND pw, char* file, int flags) {
     size_t fl=strlen(body)+cssBuf.len+jsBuf.len+strlen(ui)+1024;
     char* full=(char*)malloc(fl);
     snprintf(full,fl,
-        "<!DOCTYPE html><html><head>"
+        "<!DOCTYPE html><html%s><head>"
         "<meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">"
         "<meta charset=\"utf-8\"><style>%s</style></head><body%s>"
         "%s<div id=\"mdv-ct\">%s</div>%s</body></html>",
-        cssBuf.data, dark?" class=\"dark\"":"", ui, body, jsBuf.data);
+        dark?" style=\"background:#1e1e1e\"":"", cssBuf.data, dark?" class=\"dark\"":"", ui, body, jsBuf.data);
     free(body); free(cssBuf.data); free(jsBuf.data);
 
     RECT rc; GetClientRect(pw,&rc);

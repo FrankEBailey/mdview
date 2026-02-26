@@ -17,7 +17,7 @@ Press F3 on any `.md` file and get a clean, fully rendered preview — dark mode
 - **Full Markdown rendering** — headings, bold, italic, strikethrough, links, images, tables with column alignment, fenced and indented code blocks, blockquotes (nested), ordered/unordered/task lists, horizontal rules, autolinks, and escape sequences
 - **Syntax highlighting** — JavaScript, TypeScript, Python, C, C++, C#, Java, Rust, Go, SQL, Bash, CSS/SCSS, PHP, HTML, and XML
 - **Dark / light mode** — toggle with Ctrl+D, or auto-detected from your Windows theme on first launch
-- **Adjustable layout** — zoom in/out, widen/narrow the reading column
+- **Adjustable layout** — zoom in/out, optionally constrain reading column width
 - **Line numbers** — toggle on code blocks with Ctrl+L
 - **Table of Contents** — auto-generated sidebar from your headings
 - **Find in page** — incremental search with match highlighting and navigation
@@ -25,6 +25,7 @@ Press F3 on any `.md` file and get a clean, fully rendered preview — dark mode
 - **Persistent settings** — font size, theme, column width, and line numbers are saved and restored between sessions
 - **Print support** — Ctrl+P renders a clean printable version
 - **Progress bar** — subtle reading position indicator at the top of the viewport
+- **Full window resize** — content fills the entire viewport, resizes correctly when the lister window is maximised or dragged
 
 ## Keyboard Shortcuts
 
@@ -33,8 +34,8 @@ Press F3 on any `.md` file and get a clean, fully rendered preview — dark mode
 | `Ctrl` `+` | Zoom in |
 | `Ctrl` `-` | Zoom out |
 | `Ctrl` `0` | Reset zoom |
-| `Ctrl` `W` | Widen columns |
-| `Ctrl` `Shift` `W` | Narrow columns |
+| `Ctrl` `W` | Constrain column width (narrows reading area) |
+| `Ctrl` `Shift` `W` | Widen or remove column constraint |
 | `Ctrl` `D` | Toggle dark / light mode |
 | `Ctrl` `L` | Toggle line numbers |
 | `Ctrl` `T` | Table of Contents |
@@ -87,13 +88,13 @@ No external libraries or build systems required.
 
 ## How It Works
 
-MDView is a WLX lister plugin — a DLL that Total Commander loads when you press F3 on a matching file type. It contains a built-in Markdown-to-HTML converter and embeds an MSHTML (IE11) WebBrowser control to render the output. Keyboard input is handled by subclassing the browser's internal window, giving reliable hotkey interception without interfering with normal scrolling or TC's own key handling. Settings are persisted via TC's standard INI file mechanism.
+MDView is a WLX lister plugin — a DLL that Total Commander loads when you press F3 on a matching file type. It contains a built-in Markdown-to-HTML converter and embeds an MSHTML (IE11) WebBrowser control to render the output. Keyboard input is handled by subclassing the browser's internal window, giving reliable hotkey interception without interfering with normal scrolling or TC's own key handling. The OLE control and its child window hierarchy are resized via `IOleInPlaceObject::SetObjectRects` and `MoveWindow` to ensure the viewer fills the entire lister window at any size. Settings are persisted via TC's standard INI file mechanism.
 
 ## File List
 
 | File | Description |
 |---|---|
-| `mdview.c` | Complete plugin source (~1250 lines) |
+| `mdview.c` | Complete plugin source (~1270 lines) |
 | `mdview.def` | DLL export definitions |
 | `pluginst.inf` | Total Commander auto-install manifest |
 | `test.md` | Sample document exercising all features |
